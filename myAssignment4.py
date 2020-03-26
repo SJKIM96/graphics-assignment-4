@@ -105,17 +105,22 @@ class cameraMatrix:
         c = self.__npHeight*(2.0*(window.getHeight() - (j+1))/window.getHeight() - 1.0)
         return (self.__N.scalarMultiply(a) + self.__U.scalarMultiply(b) + self.__V.scalarMultiply(c)).insertRow(3,0.0)
 
+    # returns intersection list sorted by t0
     def minimumIntersection(self,direction,objectList):
+        #Complete this method
+        #initialize return object list
         intersectionList = []
 
+        #iterate through each object and check if it intersects
         for k in objectList:
           mInverse = k.getTinv()
           tE = mInverse*self.getE()
           tD = mInverse*direction
           t0 = k.intersection(tE, tD)
+          #if it intersects, add to intersection list
           if t0 != -1.0:
             intersectionList.append((k,t0))
-        #Complete this method
+        #sort by t0
         intersectionList.sort(key= lambda tup: tup[1])
 
         return intersectionList
@@ -188,3 +193,58 @@ class cameraMatrix:
 
     def getNpWidth(self):
         return self.__npWidth
+
+class shader:
+  
+  def __shadowed(self,object,I,S,objectList):
+	  #Complete this helper method
+    epsonlon = 0.001
+    M = object.getTinv().inverse()
+    I = M*(I + S.scalarMultiply(epsonlon))
+    S = M * S
+    #for each object check if it intersects with my current object
+    for obj in objectList:
+      mInv = obj.getTinv()
+      In = mInv* I
+      Sn = mInv * S
+      # if object intersects with other object, return true
+      if (obj.intersection(In,Sn) != -1.0):
+        return True
+    # since it did not intersect, return false
+    return False
+
+  def __init__(self,intersection,direction,camera,objectList,light):
+    #get color of the point. To do this, check if this point has an object between a light
+    #Complete this method  
+    obj = intersection[0]
+    t0 = intersection[1]
+    mInverse = obj.getTinv()
+    Ts = mInverse * light.getPosition()
+    Te = mInverse * camera.getE()
+    Td = mInverse * direction
+    I = Te + Td.scalarMultiply(t0)
+    #get s vector and normalize
+    S = Ts - I
+    S = S.normalize()
+    # get normal of current object 
+    N = obj.normalVector(I)
+    R = -S + N.scalarMultiply(S.dotProduct(N) *2)
+    V = Te - I
+    V = V.normalize()
+    Id = max(N.dotProduct(S),0)
+    Is = max(R.dotProduct(V),0)
+    
+    r = obj.getReflectance()
+    c= obj.getColor()
+    Li= light.getIntensity()
+    # check if there is an oject between the ray, if it does draw with shading
+    f = 0
+    if(not self.__shadowed(obj,I,S,objectList)):
+      f= r[0] + r[1] * Id + r[2]* Is ** r[3]
+    else:
+      f = r[0]
+    #multiply all color by f to introduce shading
+    self.__color = (int(c[0] * Li[0] *f), int(c[1] * Li[1] *f),int(c[2] * Li[2] *f))
+
+  def getShade(self):
+    return self.__color
